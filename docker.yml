@@ -1,0 +1,71 @@
+- hosts: localhost
+  tasks:
+    - name: start httpd
+      service:
+          name: httpd
+          state: started
+    - name: stop firewalld
+      service:
+          name: firewalld
+          state: stopped
+          enabled: no
+
+- hosts: docker
+  vars_files:
+    - data.yml
+  tasks:
+    - name: yum configuration dvd
+      yum_repository:
+          name: dvd
+          description: EPEL YUM REPO
+          baseurl: "file:///run/media/root/RHEL-7.5\ Server.x86_64"
+          gpgcheck: no
+          enabled: yes
+
+    - name: yum configuration
+      yum_repository:
+          name: local
+          description: EPEL YUM REPO
+          baseurl: "http://192.168.43.217/packages/"
+          gpgcheck: no
+          enabled: yes
+
+    - package:
+          name: docker-ce
+          state: present
+    - package:
+          name: python-pip
+          state: present
+
+    - service:
+          name: docker
+          state: started
+          enabled: yes
+    - pip:
+          name: docker-py
+          state: present
+    - name: find is centos installed
+      shell: "docker images | grep centos | awk '{print $1}' >  /root/mydocker.txt "
+    - name: save it in file
+      slurp:
+        src: /root/mydocker.txt
+      register: mydocker
+
+    - debug:
+        msg: "{{ mydocker['content'] | b64decode }}"
+
+    - command: docker pull centos
+    - name: "installing docker container"
+      docker_container:
+          name: "{{docker_name}}"
+          image: "centos"
+
+          volumes:
+            -  "/run/media/root/RHEL-7.5\ Server.x86_64:/dvd"
+            -  "/tmp/.X11-unix:/tmp/.X11-unix"
+          devices:
+            - /dev/snd
+          state: started
+          interactive: yes
+          tty: yes
+
